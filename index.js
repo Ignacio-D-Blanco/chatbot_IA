@@ -29,6 +29,10 @@ const client = new OpenAI({
   baseURL: 'https://api.groq.com/openai/v1'
 })
 
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', mensaje: 'Clínica Dental Bot funcionando' })
+})
+
 
 app.post('/chat', async (req, res) => {
   try {
