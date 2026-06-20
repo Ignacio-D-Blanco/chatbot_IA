@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url'
 import { obtenerOCrearUsuario, guardarMensaje, obtenerContextoCompleto } from './db.js'
 import { buscarDocumentos, formatearContexto } from './rag.js'
 import { actualizarResumen } from './memoria.js'
+import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -17,20 +18,23 @@ const app = express()
 
 app.use(cors())
 app.use(express.json())
+app.use(express.static(path.join(__dirname, '../public')))
 
-app.use(
-  express.static(
-    path.join(__dirname, '../public')
-  )
-)
+// Después del express.static, agregá:
+app.get('/', (req, res) => {
+  const publicPath = path.join(__dirname, '../public')
+  const indexPath = path.join(__dirname, '../public/index.html')
+  
+  console.log('__dirname:', __dirname)
+  console.log('publicPath existe:', fs.existsSync(publicPath))
+  console.log('index.html existe:', fs.existsSync(indexPath))
+  
+  res.sendFile(indexPath)
+})
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
   baseURL: 'https://api.groq.com/openai/v1'
-})
-
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', mensaje: 'Clínica Dental Bot funcionando' })
 })
 
 
