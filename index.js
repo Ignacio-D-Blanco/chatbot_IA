@@ -23,14 +23,11 @@ app.use(express.json())
 // Reemplazar todas las referencias a __dirname para el public por:
 const rootDir = process.cwd()
 console.log('rootDir:', rootDir)
-console.log('__dirname:', __dirname)
 
 app.use(express.static(path.join(rootDir, 'public')))
 app.get('/', (req, res) => {
   res.sendFile(path.join(rootDir, 'public', 'index.html'))
 })
-
-
 
 
 const client = new OpenAI({
