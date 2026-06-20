@@ -18,19 +18,11 @@ const app = express()
 
 app.use(cors())
 app.use(express.json())
-app.use(express.static(path.join(__dirname, '../public')))
+// app.use(express.static(path.join(__dirname, '../public'))) -> para local
+// para render
+app.use(express.static(path.join(__dirname, '../../public')))
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../../public/index.html')))
 
-// Después del express.static, agregá:
-app.get('/', (req, res) => {
-  const publicPath = path.join(__dirname, '../public')
-  const indexPath = path.join(__dirname, '../public/index.html')
-  
-  console.log('__dirname:', __dirname)
-  console.log('publicPath existe:', fs.existsSync(publicPath))
-  console.log('index.html existe:', fs.existsSync(indexPath))
-  
-  res.sendFile(indexPath)
-})
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
