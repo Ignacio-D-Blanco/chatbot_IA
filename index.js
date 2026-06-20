@@ -10,8 +10,6 @@ import { actualizarResumen } from './memoria.js'
 import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
 dotenv.config()
 
 const app = express()
@@ -19,9 +17,20 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 // app.use(express.static(path.join(__dirname, '../public'))) -> para local
+
 // para render
-app.use(express.static(path.join(__dirname, '../../public')))
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../../public/index.html')))
+
+// Reemplazar todas las referencias a __dirname para el public por:
+const rootDir = process.cwd()
+console.log('rootDir:', rootDir)
+console.log('__dirname:', __dirname)
+
+app.use(express.static(path.join(rootDir, 'public')))
+app.get('/', (req, res) => {
+  res.sendFile(path.join(rootDir, 'public', 'index.html'))
+})
+
+
 
 
 const client = new OpenAI({
