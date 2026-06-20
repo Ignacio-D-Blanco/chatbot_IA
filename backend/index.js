@@ -21,17 +21,13 @@ app.use(express.json())
 
 // Detectar entorno automáticamente
 const isDev = process.env.NODE_ENV !== 'production'
-const publicPath = isDev
-  ? path.join(__dirname, '../public')   // local: backend/../public
-  : path.join(process.cwd(), 'public') // Render: raíz del repo/public
-
-console.log('Entorno:', isDev ? 'desarrollo' : 'producción')
-console.log('Sirviendo static desde:', publicPath)
+const publicPath = path.join(__dirname, 'public')
 
 app.use(express.static(publicPath))
 app.get('/', (req, res) => {
   res.sendFile(path.join(publicPath, 'index.html'))
 })
+
 
 const client = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,
