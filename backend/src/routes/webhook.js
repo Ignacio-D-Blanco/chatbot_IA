@@ -1,6 +1,12 @@
 
+import { Router } from 'express'
+import { obtenerOCrearUsuario, guardarMensaje, obtenerContextoCompleto } from '../db/db.js'
+import { obtenerTenant } from '../db/tenant.js'
+import { extraer, responder } from '../services/ai.js'
 
-app.post('/webhook', async (req, res) => {
+const router = Router()
+
+router.post('/', async (req, res) => {
   res.status(200).send('OK')
 
   const body = req.body
@@ -25,10 +31,8 @@ app.post('/webhook', async (req, res) => {
   }
 })
 
-// Verificación del webhook — WhatsApp lo requiere al configurar
-app.get('/webhook', (req, res) => {
+router.get('/', (req, res) => {
   const VERIFY_TOKEN = 'mi_token_secreto_123'
-
   const mode = req.query['hub.mode']
   const token = req.query['hub.verify_token']
   const challenge = req.query['hub.challenge']
@@ -40,3 +44,5 @@ app.get('/webhook', (req, res) => {
     res.status(403).send('Token inválido')
   }
 })
+
+export default router
