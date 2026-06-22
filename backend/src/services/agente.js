@@ -1,6 +1,5 @@
-import OpenAI from 'openai'
-import * as dotenv from 'dotenv'
-import { createClient } from '@supabase/supabase-js'
+import supabase from '../db/supabase.js'
+
 dotenv.config()
 
 const client = new OpenAI({

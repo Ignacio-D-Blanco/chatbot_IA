@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { pipeline } from '@xenova/transformers'
 import * as dotenv from 'dotenv'
-import { documentos } from './documentos.js'
+import { documentos } from '../../documentos.js'
 
 dotenv.config()
 
@@ -50,3 +50,30 @@ async function ingestar() {
 }
 
 ingestar()
+/*
+async function ingestar(tenantSlug) {
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('id, name')
+    .eq('slug', tenantSlug)
+    .single()
+
+  console.log(`Ingestando documentos para: ${tenant.name}`)
+
+  for (const doc of documentos) {
+    const embedding = await generarEmbedding(doc.content)
+
+    await supabase
+      .from('documents')
+      .insert({
+        content:   doc.content,
+        embedding: embedding,
+        metadata:  doc.metadata,
+        tenant_id: tenant.id    
+      })
+    console.log(`✅ ${doc.metadata.tipo}`)
+  }
+}
+const tenantSlug = process.argv[2] || 'clinica-dental-palermo'
+ingestar(tenantSlug)
+*/

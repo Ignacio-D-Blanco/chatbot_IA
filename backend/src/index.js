@@ -4,11 +4,11 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import fs from 'fs'
-import { obtenerOCrearUsuario, guardarMensaje, obtenerContextoCompleto } from './db.js'
-import { buscarDocumentos, formatearContexto } from './rag.js'
-import { actualizarResumen } from './memoria.js'
-import { obtenerTenant } from './tenant.js'
+
+import { obtenerOCrearUsuario, guardarMensaje, obtenerContextoCompleto } from './db/db.js'
+import { buscarDocumentos, formatearContexto } from './services/rag.js'
+import { actualizarResumen } from './services/memoria.js'
+import { obtenerTenant } from './db/tenant.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -38,8 +38,8 @@ const client = new OpenAI({
 
 app.post('/chat', async (req, res) => {
   try {
-    const { 
-      mensaje, 
+    const {
+      mensaje,
       phone = '5491100000000',
       tenant_slug = 'clinica-dental-palermo'  // default para compatibilidad
     } = req.body
@@ -54,9 +54,9 @@ app.post('/chat', async (req, res) => {
     const datos = await extraer(mensaje)
     // 6. Responder usando el system prompt del tenant
     const respuesta = await responder(
-      mensaje, 
-      datos, 
-      recientes, 
+      mensaje,
+      datos,
+      recientes,
       resumen,
       tenant  // ← pasamos el tenant completo
     )
@@ -77,37 +77,38 @@ app.post('/chat', async (req, res) => {
 
 
 app.post('/webhook', async (req, res) => {
-  // WhatsApp siempre espera un 200 OK inmediato
-  // Si tardás más de 3 segundos en responder, reintenta el webhook
-  res.status(200).send('OK')  
-  // Procesamos el mensaje después de confirmar recepción
-  const body = req.body
-  console.log('Webhook recibido:', JSON.stringify(body, null, 2))
-  // Extraemos el mensaje según el formato real de WhatsApp Business API
-  const mensaje = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body  
-  if (!mensaje) {
-    console.log('No hay mensaje de texto en el webhook')
-    return
-  }
+  res.status(200).send('OK')
 
-  console.log('Mensaje extraído:', mensaje)
-  
-  // Procesamos con nuestro pipeline existente
-  const datos = await extraer(mensaje)
-  const respuesta = await responder(mensaje, datos)
-  
-  console.log('Respuesta generada:', respuesta)
-  // En producción acá llamarías a la API de WhatsApp para responder
+  const body = req.body
+  const mensaje = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body
+  const phone = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.from
+
+  if (!mensaje) return
+
+  try {
+    const tenant = await obtenerTenant('clinica-dental-palermo')
+    const usuario = await obtenerOCrearUsuario(phone ?? 'webhook-user', tenant.id)
+    await guardarMensaje(usuario.id, 'user', mensaje, tenant.id)
+
+    const { resumen, recientes } = await obtenerContextoCompleto(usuario.id)
+    const datos = await extraer(mensaje)
+    const respuesta = await responder(mensaje, datos, recientes, resumen, tenant)
+
+    await guardarMensaje(usuario.id, 'assistant', respuesta, tenant.id)
+    console.log('Respuesta generada:', respuesta)
+  } catch (error) {
+    console.error('Error en webhook:', error)
+  }
 })
 
 // Verificación del webhook — WhatsApp lo requiere al configurar
 app.get('/webhook', (req, res) => {
   const VERIFY_TOKEN = 'mi_token_secreto_123'
-  
-  const mode      = req.query['hub.mode']
-  const token     = req.query['hub.verify_token']
+
+  const mode = req.query['hub.mode']
+  const token = req.query['hub.verify_token']
   const challenge = req.query['hub.challenge']
-  
+
   if (mode === 'subscribe' && token === VERIFY_TOKEN) {
     console.log('Webhook verificado por WhatsApp')
     res.status(200).send(challenge)
@@ -222,7 +223,6 @@ Usuario: "Quiero mover mi turno de limpieza al viernes"
   } catch (error) {
     console.log(`❌ Error en extraer: ${error.message}`)
   }
-
   // Siempre devuelve algo válido
   console.log('⚠️ Usando fallback para extraer')
   return FALLBACK
@@ -270,10 +270,5 @@ FORMATO: tono cálido y profesional, máximo 3 oraciones.`
   return response.choices[0].message.content.trim()
 }
 
-async function main() {
-  for (const mensaje of mensajes) {
-    await procesarMensaje(mensaje)
-  }
-}
 
 

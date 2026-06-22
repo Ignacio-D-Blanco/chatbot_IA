@@ -1,12 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-import { pipeline } from '@xenova/transformers'
-import * as dotenv from 'dotenv'
-dotenv.config()
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-)
+import supabase from '../db/supabase.js'
 
 let extractor = null
 
@@ -38,13 +30,10 @@ export async function buscarDocumentos(pregunta, limite = 3) {
 
   if (error) throw error
 
-  // Si la búsqueda vectorial devuelve resultados, usarlos
   if (data && data.length > 0) {
     console.log('📄 Documentos encontrados por vector:', data.length)
     return data
   }
-
-  // Fallback — búsqueda por palabras clave en el contenido
   console.log('⚠️ Vector devolvió 0 — usando fallback por texto')
   
   const palabras = pregunta

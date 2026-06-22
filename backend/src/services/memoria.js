@@ -1,14 +1,6 @@
-import supabase from './supabase.js'
-import OpenAI from 'openai'
-import * as dotenv from 'dotenv'
-dotenv.config()
+import supabase from '../db/supabase.js'
 
-const client = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: 'https://api.groq.com/openai/v1'
-})
 
-// Obtener el resumen actual del usuario
 export async function obtenerResumen(user_id) {
   const { data } = await supabase
     .from('conversation_summaries')
@@ -18,11 +10,9 @@ export async function obtenerResumen(user_id) {
   return data?.summary ?? ''
 }
 
-// Actualizar el resumen incorporando los mensajes nuevos
 export async function actualizarResumen(user_id, mensajesNuevos) {
   const resumenActual = await obtenerResumen(user_id)
 
-  // Si no hay mensajes nuevos suficientes, no actualizamos
   if (mensajesNuevos.length < 4) return resumenActual
 
   const conversacion = mensajesNuevos
@@ -55,10 +45,7 @@ Devolvé ÚNICAMENTE el resumen, sin explicaciones.`
       }
     ]
   })
-
   const nuevoResumen = response.choices[0].message.content.trim()
-
-  // Upsert — si existe lo actualiza, si no existe lo crea
   await supabase
     .from('conversation_summaries')
     .upsert({

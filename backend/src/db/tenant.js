@@ -1,5 +1,7 @@
 import supabase from './supabase.js'
 
+
+
 export async function obtenerTenant(slug) {
   const { data, error } = await supabase
     .from('tenants')
