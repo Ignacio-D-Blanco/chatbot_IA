@@ -8,6 +8,7 @@ import fs from 'fs'
 import { obtenerOCrearUsuario, guardarMensaje, obtenerContextoCompleto } from './db.js'
 import { buscarDocumentos, formatearContexto } from './rag.js'
 import { actualizarResumen } from './memoria.js'
+import { obtenerTenant } from './tenant.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -34,43 +35,40 @@ const client = new OpenAI({
   baseURL: 'https://api.groq.com/openai/v1'
 })
 
+
 app.post('/chat', async (req, res) => {
   try {
-    const { mensaje, phone = '5491100000000' } = req.body
-
-    // 1. Usuario
-    const usuario = await obtenerOCrearUsuario(phone)
-
-    // 2. Guardar mensaje del usuario
-    await guardarMensaje(usuario.id, 'user', mensaje)
-
-    // 3. Contexto completo: resumen + recientes
+    const { 
+      mensaje, 
+      phone = '5491100000000',
+      tenant_slug = 'clinica-dental-palermo'  // default para compatibilidad
+    } = req.body
+    const tenant = await obtenerTenant(tenant_slug)
+    // 2. Usuario vinculado al tenant
+    const usuario = await obtenerOCrearUsuario(phone, tenant.id)
+    // 3. Guardar mensaje
+    await guardarMensaje(usuario.id, 'user', mensaje, tenant.id)
+    // 4. Contexto
     const { resumen, recientes } = await obtenerContextoCompleto(usuario.id)
-
-    // 4. RAG
+    // 5. Extraer intención
     const datos = await extraer(mensaje)
-    const datosSeguro = datos ?? {
-      intencion: 'OTRA',
-      procedimiento: null,
-      urgente: false,
-      resumen: mensaje.slice(0, 50)
-    }
-    const respuesta = await responder(mensaje, datos, recientes, resumen)
-
-    // 5. Guardar respuesta
-    await guardarMensaje(usuario.id, 'assistant', respuesta)
-
-    // 6. Actualizar resumen con los últimos mensajes
-    // Lo hacemos async sin bloquear la respuesta al usuario
-    const todosLosRecientes = [
+    // 6. Responder usando el system prompt del tenant
+    const respuesta = await responder(
+      mensaje, 
+      datos, 
+      recientes, 
+      resumen,
+      tenant  // ← pasamos el tenant completo
+    )
+    // 7. Guardar respuesta
+    await guardarMensaje(usuario.id, 'assistant', respuesta, tenant.id)
+    // 8. Actualizar resumen
+    actualizarResumen(usuario.id, [
       ...recientes,
       { role: 'user', content: mensaje },
       { role: 'assistant', content: respuesta }
-    ]
-    actualizarResumen(usuario.id, todosLosRecientes).catch(console.error)
-
+    ]).catch(console.error)
     res.json({ respuesta, datos })
-
   } catch (error) {
     console.error(error)
     res.status(500).json({ error: 'Error interno' })
@@ -78,24 +76,20 @@ app.post('/chat', async (req, res) => {
 })
 
 
-// Endpoint que simula recibir un webhook de WhatsApp
 app.post('/webhook', async (req, res) => {
   // WhatsApp siempre espera un 200 OK inmediato
   // Si tardás más de 3 segundos en responder, reintenta el webhook
-  res.status(200).send('OK')
-  
+  res.status(200).send('OK')  
   // Procesamos el mensaje después de confirmar recepción
   const body = req.body
   console.log('Webhook recibido:', JSON.stringify(body, null, 2))
-  
   // Extraemos el mensaje según el formato real de WhatsApp Business API
-  const mensaje = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body
-  
+  const mensaje = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.text?.body  
   if (!mensaje) {
     console.log('No hay mensaje de texto en el webhook')
     return
   }
-  
+
   console.log('Mensaje extraído:', mensaje)
   
   // Procesamos con nuestro pipeline existente
@@ -234,7 +228,7 @@ Usuario: "Quiero mover mi turno de limpieza al viernes"
   return FALLBACK
 }
 
-async function responder(mensaje, datos, historial = [], resumen = '') {
+async function responder(mensaje, datos, historial = [], resumen = '', tenant) {
   const docsRelevantes = await buscarDocumentos(mensaje)
   const contextoRAG = formatearContexto(docsRelevantes)
 
@@ -255,22 +249,18 @@ async function responder(mensaje, datos, historial = [], resumen = '') {
     messages: [
       {
         role: 'system',
-        content: `Sos el asistente virtual de Clínica Dental Palermo.
+        content: `${tenant.system_prompt}
 
 MEMORIA DEL PACIENTE:
-${resumen || 'Primera conversación con este paciente.'}
+${resumen || 'Primera conversación.'}
 
-CONTEXTO DE LA CLÍNICA:
+CONTEXTO DE DOCUMENTOS:
 ${contextoRAG}
 
 DATOS DEL MENSAJE:
 ${contexto}
 
-INSTRUCCIONES:
-- Usá la MEMORIA para personalizar la respuesta
-- Si el paciente ya tiene turno agendado, mencionalo cuando sea relevante
-- Usá el CONTEXTO para responder sobre precios y servicios
-- Tono cálido y profesional, máximo 3 oraciones`
+FORMATO: tono cálido y profesional, máximo 3 oraciones.`
       },
       ...mensajesHistorial,
       { role: 'user', content: mensaje }
