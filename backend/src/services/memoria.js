@@ -1,5 +1,17 @@
 import supabase from '../db/supabase.js'
+import OpenAI from 'openai'
+import * as dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
+import path from 'path'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+dotenv.config({ path: path.join(__dirname, '../.env') })
+
+const client = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1'
+})
 
 export async function obtenerResumen(user_id) {
   const { data } = await supabase

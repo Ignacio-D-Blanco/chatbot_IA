@@ -1,4 +1,5 @@
 import supabase from '../db/supabase.js'
+import { pipeline } from '@xenova/transformers'
 
 let extractor = null
 
